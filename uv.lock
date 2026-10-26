@@ -715,6 +715,15 @@ wheels = [
 ]
 
 [[package]]
+name = "py4j"
+version = "0.10.9.7"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/1e/f2/b34255180c72c36ff7097f7c2cdca02abcbd89f5eebf7c7c41262a9a0637/py4j-0.10.9.7.tar.gz", hash = "sha256:0b6e5315bb3ada5cf62ac651d107bb2ebc02def3dee9d9548e3baac644ea8dbb", size = 1508234, upload-time = "2022-08-12T22:49:09.792Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/10/30/a58b32568f1623aaad7db22aa9eafc4c6c194b429ff35bdc55ca2726da47/py4j-0.10.9.7-py2.py3-none-any.whl", hash = "sha256:85defdfd2b2376eb3abf5ca6474b51ab7e0de341c75a02f46dc9b5976f5a5c1b", size = 200481, upload-time = "2022-08-12T22:49:07.05Z" },
+]
+
+[[package]]
 name = "pycparser"
 version = "3.12"
 source = { registry = "https://pypi.org/simple" }
@@ -826,6 +835,15 @@ sdist = { url = "https://files.pythonhosted.org/packages/bd/11/293dd436aea955d45
 wheels = [
     { url = "https://files.pythonhosted.org/packages/8d/59/b4572118e098ac8e46e399a1dd0f2d85403ce8bbaad9ec79373ed6badaf9/PySocks-1.7.1-py3-none-any.whl", hash = "sha256:2725bd0a9925919b9b51739eea5f9e2bae91e83288108a9ad338b2e3a4435ee5", size = 16725, upload-time = "2019-09-20T02:06:22.938Z" },
 ]
+
+[[package]]
+name = "pyspark"
+version = "3.5.6"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "py4j" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/2e/62/36e50d38e5fe158e97cddec983b44f9417b1e205b02320e3c463b5f802fa/pyspark-3.5.6.tar.gz", hash = "sha256:f8b1c4360e41ab398c64904fae08740503bcb6bd389457d659fa6d9f2952cc48", size = 317359167, upload-time = "2025-05-27T08:24:20.82Z" }
 
 [[package]]
 name = "pytest"
@@ -1409,6 +1427,9 @@ dashboard = [
     { name = "requests" },
     { name = "taipy-gui" },
 ]
+silver = [
+    { name = "pyspark" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -1424,12 +1445,13 @@ requires-dist = [
     { name = "psycopg", extras = ["binary"], marker = "extra == 'collection'", specifier = ">=3.2,<4" },
     { name = "pydantic-settings", marker = "extra == 'api'", specifier = ">=2.6,<3" },
     { name = "pydantic-settings", marker = "extra == 'collection'", specifier = ">=2.6,<3" },
+    { name = "pyspark", marker = "extra == 'silver'", specifier = "==3.5.6" },
     { name = "requests", marker = "extra == 'dashboard'", specifier = ">=2.32,<3" },
     { name = "selenium", marker = "extra == 'collection'", specifier = ">=4.27,<5" },
     { name = "taipy-gui", marker = "extra == 'dashboard'", specifier = ">=4,<5" },
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'api'", specifier = ">=0.32,<1" },
 ]
-provides-extras = ["collection", "api", "dashboard"]
+provides-extras = ["collection", "api", "dashboard", "silver"]
 
 [package.metadata.requires-dev]
 dev = [

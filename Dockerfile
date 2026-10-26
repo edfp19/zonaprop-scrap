@@ -13,10 +13,15 @@ ENV PYTHONPATH=/app/src \
     PATH="/app/.venv/bin:$PATH"
 
 FROM runtime-base AS pipeline
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends openjdk-17-jre-headless \
+    && ln -s "$(dirname "$(dirname "$(readlink -f "$(command -v java)")")")" /opt/java \
+    && rm -rf /var/lib/apt/lists/*
+ENV JAVA_HOME=/opt/java
 COPY pyproject.toml uv.lock README.md ./
-RUN uv sync --frozen --no-dev --extra collection --no-install-project
+RUN uv sync --frozen --no-dev --extra collection --extra silver --no-install-project
 COPY src ./src
-RUN uv sync --frozen --no-dev --extra collection
+RUN uv sync --frozen --no-dev --extra collection --extra silver
 
 FROM runtime-base AS api
 COPY pyproject.toml uv.lock README.md ./

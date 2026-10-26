@@ -1,5 +1,20 @@
 name: zona-oportunidades
 
+x-app-environment: &app_environment
+  DATA_ROOT: /data
+  POSTGRES_HOST: postgres
+  POSTGRES_PORT: 5432
+  POSTGRES_DB: ${POSTGRES_DB:-zonaprop}
+  POSTGRES_USER: ${POSTGRES_USER:-zonaprop}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-zonaprop}
+  SELENIUM_URL: http://selenium:4444/wd/hub
+  COLLECTION_MAX_PAGES: ${COLLECTION_MAX_PAGES:-1}
+  COLLECTION_DELAY_SECONDS: ${COLLECTION_DELAY_SECONDS:-3}
+  PIPELINE_INTERVAL_SECONDS: ${PIPELINE_INTERVAL_SECONDS:-86400}
+  COMPARABLE_MIN_COUNT: ${COMPARABLE_MIN_COUNT:-10}
+  COMPARABLE_AREA_TOLERANCE: ${COMPARABLE_AREA_TOLERANCE:-0.15}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -41,20 +56,10 @@ services:
     env_file:
       - path: .env
         required: false
-    environment: &app_environment
-      DATA_ROOT: /data
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5432
-      POSTGRES_DB: ${POSTGRES_DB:-zonaprop}
-      POSTGRES_USER: ${POSTGRES_USER:-zonaprop}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-zonaprop}
-      SELENIUM_URL: http://selenium:4444/wd/hub
-      COLLECTION_MAX_PAGES: ${COLLECTION_MAX_PAGES:-1}
-      COLLECTION_DELAY_SECONDS: ${COLLECTION_DELAY_SECONDS:-3}
-      PIPELINE_INTERVAL_SECONDS: ${PIPELINE_INTERVAL_SECONDS:-86400}
-      COMPARABLE_MIN_COUNT: ${COMPARABLE_MIN_COUNT:-10}
-      COMPARABLE_AREA_TOLERANCE: ${COMPARABLE_AREA_TOLERANCE:-0.15}
-      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    environment:
+      <<: *app_environment
+      SPARK_MASTER: ${SPARK_MASTER:-local[2]}
+      TZ: UTC
     volumes:
       - ./data:/data
     depends_on:

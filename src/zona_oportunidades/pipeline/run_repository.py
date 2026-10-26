@@ -26,16 +26,34 @@ class PipelineRunRepository:
                 (run_id, datetime.now(UTC)),
             )
 
-    def succeed(self, run_id: str, bronze_records: int, warning: str | None = None) -> None:
+    def record_bronze(self, run_id: str, count: int) -> None:
+        with psycopg.connect(self.dsn) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE ops.pipeline_runs
+                SET bronze_records = %s
+                WHERE run_id = %s
+                """,
+                (count, run_id),
+            )
+
+    def succeed(
+        self,
+        run_id: str,
+        bronze_records: int,
+        warning: str | None = None,
+        *,
+        silver_records: int | None = None,
+    ) -> None:
         with psycopg.connect(self.dsn) as connection, connection.cursor() as cursor:
             cursor.execute(
                 """
                 UPDATE ops.pipeline_runs
                 SET status = 'EXITOSO', finished_at = %s, bronze_records = %s,
-                    error_message = %s
+                    silver_records = COALESCE(%s, silver_records), error_message = %s
                 WHERE run_id = %s
                 """,
-                (datetime.now(UTC), bronze_records, warning, run_id),
+                (datetime.now(UTC), bronze_records, silver_records, warning, run_id),
             )
 
     def fail(self, run_id: str, message: str) -> None:

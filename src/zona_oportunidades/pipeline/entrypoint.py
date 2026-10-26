@@ -8,6 +8,7 @@ from zona_oportunidades.collection.application.collect_listings import CollectLi
 from zona_oportunidades.collection.domain.models import SEARCH_TARGETS
 from zona_oportunidades.collection.infrastructure.jsonl_repository import JsonlBronzeRepository
 from zona_oportunidades.collection.infrastructure.selenium_source import ZonapropSeleniumSource
+from zona_oportunidades.listings.runner import run_bronze_file
 from zona_oportunidades.pipeline.run_repository import PipelineRunRepository
 from zona_oportunidades.shared.config import get_settings
 from zona_oportunidades.shared.logging import configure_logging
@@ -39,18 +40,30 @@ def run_collection() -> None:
             delay_seconds=settings.collection_delay_seconds,
         )
         result = use_case.execute(run_id)
+        runs.record_bronze(run_id, result.records)
+        silver_result = run_bronze_file(
+            result.bronze_path, settings.data_root, master=settings.spark_master
+        )
         warning = None
         if result.errors:
             warning = f"La recolección finalizó con {len(result.errors)} error(es) parcial(es)."
-        runs.succeed(run_id, result.records, warning)
+        runs.succeed(
+            run_id,
+            result.records,
+            warning,
+            silver_records=silver_result.silver_records,
+        )
         logger.info(
-            "Checkpoint Bronze completo: %s registros en %s (%s errores parciales)",
+            "Checkpoint Bronze→Silver completo: %s Bronze en %s; %s Silver en %s "
+            "(%s errores parciales)",
             result.records,
             result.bronze_path,
+            silver_result.silver_records,
+            silver_result.output_path,
             len(result.errors),
         )
     except Exception as exc:
-        logger.exception("Falló la ejecución Bronze %s", run_id)
+        logger.exception("Falló la ejecución Bronze→Silver %s", run_id)
         runs.fail(run_id, str(exc))
 
 

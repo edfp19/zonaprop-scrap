@@ -26,6 +26,9 @@ dashboard = [
   "requests>=2.32,<3",
   "taipy-gui>=4,<5",
 ]
+silver = [
+  "pyspark==3.5.6",
+]
 [dependency-groups]
 dev = [
   "pytest>=8.3,<9",

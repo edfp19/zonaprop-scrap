@@ -34,8 +34,8 @@ PAGE = """
 Departamentos en CABA y AMBA · Proyecto educativo de ingeniería de datos
 
 <|part|class_name=checkpoint|
-**Checkpoint Bronze.** Estamos preservando observaciones originales. Todavía no calculamos
-oportunidades.
+**Checkpoint 2: Bronze + Silver.** Preservamos observaciones originales y las transformamos en
+Parquet histórico. Todavía no calculamos oportunidades ni puntajes Gold.
 |>
 
 ## Última ejecución
@@ -64,7 +64,7 @@ oportunidades.
 ## Capas del proyecto
 
 1. **Bronze — actual:** JSONL append-only con el contenido observado y su contexto.
-2. **Silver — próximo:** Parquet tipado, normalizado y deduplicado mediante Spark.
+2. **Silver — actual:** Parquet tipado, normalizado y deduplicado mediante Spark.
 3. **Gold:** comparables y candidatos por debajo del promedio en PostgreSQL.
 """
 

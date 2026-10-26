@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     collection_delay_seconds: float = Field(default=3, ge=1)
     collection_page_timeout_seconds: int = Field(default=45, ge=5)
     pipeline_interval_seconds: int = Field(default=86_400, ge=60)
+    spark_master: str = "local[2]"
     comparable_min_count: int = Field(default=10, ge=1)
     comparable_area_tolerance: float = Field(default=0.15, gt=0, le=0.5)
     log_level: str = "INFO"
