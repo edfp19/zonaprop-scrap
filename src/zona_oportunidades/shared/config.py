@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     @property
     def postgres_dsn(self) -> str:
         if self.database_url is not None:
-            return self.database_url.get_secret_value()
+            return self.database_url.get_secret_value().strip()
         return (
             f"postgresql://{quote(self.postgres_user, safe='')}:"
             f"{quote(self.postgres_password, safe='')}"

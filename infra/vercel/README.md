@@ -1,7 +1,8 @@
 # Website deployment
 
 The cloud website uses the same Leaflet files and FastAPI queries as Compose.
-Vercel serves the generated `public/` files and runs `app.py` as a Python function.
+Vercel runs `app.py` as a Python function, serving the existing dashboard HTML and a
+FastAPI StaticFiles mount for CSS/JavaScript. Vercel can promote the static mount to its CDN.
 The function reads Gold from Neon with `web_reader` over the pooled TLS connection.
 Spark, Java, Selenium and Flask are excluded from the installed API dependencies.
 
@@ -13,9 +14,12 @@ Spark, Java, Selenium and Flask are excluded from the installed API dependencies
 4. Set a password privately in the SQL editor with
    `ALTER ROLE web_reader PASSWORD 'REPLACE_WITH_YOUR_PASSWORD';`.
    Do not save the real statement in the repository or chat.
-5. Use Neon's connection dialog to obtain the **pooled** connection URL for `web_reader`,
-   including `sslmode=require`. Add it directly to Vercel as `DATABASE_URL` for Production
-   and Preview. Do not use the owner URL for the website.
+5. Obtain the **pooled** connection URL for `web_reader`, including `sslmode=require`.
+   If the Connect role menu does not list the SQL-created reader, construct its URL using
+   `postgresql://web_reader:ENCODED_PASSWORD@POOLED_HOST/neondb?sslmode=require`, inserting
+   `-pooler` after the endpoint ID in the known host. URL-encode special characters in the
+   password. Add the URL directly to Vercel as `DATABASE_URL` for Production and Preview.
+   Do not use the owner URL for the website. Surrounding whitespace is trimmed by Settings.
 
 The reader has SELECT on the two serving tables and no write grants. Creation of roles requires
 the owner connection. This setup does not upload property data; the database still needs a seed.
@@ -65,27 +69,29 @@ After code is pushed and Gold is seeded:
 5. Inspect the first build log: only the `api` extra should be installed, with no pyspark or
    selenium. Check the function bundle size in the deployment output.
 
-The install command uses `uv sync --active --frozen --no-dev --extra api --no-editable`:
+The install command uses
+`uv sync --active --frozen --no-dev --extra api --no-editable --reinstall-package zona-oportunidades`:
 `--active` installs into Vercel's build environment, and the committed lockfile pins dependency
 versions. `--no-editable` installs the actual package files instead of a link to the build
-checkout's `src/` directory, which is not a usable import path in the deployed function. The build
-command copies the dashboard assets into `public/`; no second copy is maintained in Git.
+checkout's `src/` directory, which is not a usable import path in the deployed function.
+`--reinstall-package` refreshes our package from source even if uv has cached an older wheel.
+The cloud entrypoint serves the packaged dashboard files directly; no asset-copy build command
+or second source copy is needed.
 `/api/mapa` is an alias for the existing `/mapa` query, so the browser URL works in both hosts.
 
 ## Local checks
 
 ```bash
-uv run python infra/vercel/build_static.py
 uv run ruff check .
 uv run mypy
-uv run pytest tests/test_config.py tests/dashboard -q
+uv run --extra api --extra dashboard --with httpx pytest tests/test_config.py tests/test_cloud_entrypoint.py tests/dashboard -q
 ```
 
 Check the installed API package independently of checkout paths and editable `.pth` links:
 
 ```bash
 uv venv --python 3.12 /tmp/zonaprop-vercel-env
-VIRTUAL_ENV=/tmp/zonaprop-vercel-env uv sync --active --frozen --no-dev --extra api --no-editable
+VIRTUAL_ENV=/tmp/zonaprop-vercel-env uv sync --active --frozen --no-dev --extra api --no-editable --reinstall-package zona-oportunidades
 /tmp/zonaprop-vercel-env/bin/python -I -S -c '
 import sys
 sys.path.insert(0, "/tmp/zonaprop-vercel-env/lib/python3.12/site-packages")
@@ -100,8 +106,8 @@ This simulates loading vendored packages by adding site-packages explicitly with
 editable links. It checks imports and the health function, not a live Neon connection or the
 complete Vercel bundle.
 
-Compose's existing API and Flask dashboard keep their separate images. Running the build script
-does not start collection or contact Neon. The cloud function requires Python 3.12, which is
+Compose's existing API and Flask dashboard keep their separate images. Local asset checks
+do not start collection or contact Neon. Vercel uses Python 3.12, which is
 within the project's supported range. A successful local check does not validate a Vercel build
 or Neon grants; those must be checked on the first deployment.
 
@@ -109,7 +115,8 @@ or Neon grants; those must be checked on the first deployment.
 
 The initial Gold seed is committed in Neon: 96 rows, with 95 map locations. The reader login
 was verified with a direct connection returning current_user=web_reader and total=96.
-The first Vercel deployment, Silver bucket setup, and the GitHub Actions batch job are pending.
+The first Vercel deployment was created, but website verification is in progress. Silver bucket
+setup and the GitHub Actions batch job are pending.
 No workflow or schedule has been enabled. Silver retention and Bronze cleanup remain
 planned policies. The current Gold freshness window is 35 days; a retained snapshot does not
 automatically become fresh as time passes.

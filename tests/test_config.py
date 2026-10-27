@@ -1,13 +1,15 @@
 from urllib.parse import unquote, urlsplit
 
+import pytest
 from pydantic import SecretStr
 
 from zona_oportunidades.shared.config import Settings
 
 
-def test_cloud_url_preserves_tls_and_is_hidden_from_settings_repr(monkeypatch) -> None:
+@pytest.mark.parametrize("padding", ["", "\n", "\r\n", " \n"])
+def test_cloud_url_preserves_tls_and_is_hidden_from_settings_repr(monkeypatch, padding) -> None:
     url = "postgresql://reader:private-password@example.test/db?sslmode=require"
-    monkeypatch.setenv("DATABASE_URL", url)
+    monkeypatch.setenv("DATABASE_URL", padding + url + padding)
     settings = Settings(_env_file=None)
     assert settings.postgres_dsn == url
     assert "private-password" not in repr(settings)

@@ -1,1 +1,1 @@
-"""Dashboard Taipy en español."""
+"""Leaflet dashboard assets and the local Flask server."""
