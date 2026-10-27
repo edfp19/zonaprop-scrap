@@ -195,8 +195,8 @@ deshabilitada. Para desarrollo local se pueden ejecutar las pruebas de Spark con
 ## Cloud deployment
 
 The prepared website configuration uses Vercel for static files and FastAPI, and Neon for Gold.
-See [the setup steps](infra/vercel/README.md). The initial Gold seed and Neon reader login are
-verified; website deployment is still pending.
+See [the setup steps](infra/vercel/README.md). The initial Gold seed, reader login and website
+are verified at <https://zonaprop-scrap.vercel.app/> (96 rows, 95 map locations at deployment).
 no cloud collection workflow or schedule is enabled. Local Compose remains the application bootstrap.
 
 ## Checkpoint 3 — Gold

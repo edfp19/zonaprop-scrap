@@ -115,8 +115,10 @@ or Neon grants; those must be checked on the first deployment.
 
 The initial Gold seed is committed in Neon: 96 rows, with 95 map locations. The reader login
 was verified with a direct connection returning current_user=web_reader and total=96.
-The first Vercel deployment was created, but website verification is in progress. Silver bucket
-setup and the GitHub Actions batch job are pending.
+The website is verified at <https://zonaprop-scrap.vercel.app/>: HTML and map API return 200,
+the API returns 96 rows, and the browser displays 95 locations. A loaded photo, its Zonaprop
+link, green/red pins, the above-average filter, and a card inside a mobile viewport were checked.
+Silver bucket setup and the GitHub Actions batch job are pending.
 No workflow or schedule has been enabled. Silver retention and Bronze cleanup remain
 planned policies. The current Gold freshness window is 35 days; a retained snapshot does not
 automatically become fresh as time passes.
