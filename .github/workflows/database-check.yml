@@ -1,7 +1,12 @@
-name: Database writer check (manual)
+name: Database writer and manual Gold refresh
 
 on:
   workflow_dispatch:
+    inputs:
+      gold_snapshot:
+        description: Optional prepared Gold payload; leave empty for read-only checking
+        type: string
+        required: false
 
 permissions:
   contents: read
@@ -26,6 +31,12 @@ jobs:
         run: |
           docker compose run --rm --no-deps -T -e DATABASE_URL api \
             python -m zona_oportunidades.operations.database_check
+      - name: Publish prepared Gold snapshot
+        if: inputs.gold_snapshot != ''
+        run: |
+          python3 -c 'import json, os; print(json.load(open(os.environ["GITHUB_EVENT_PATH"]))["inputs"]["gold_snapshot"])' | \
+          docker compose run --rm --no-deps -T -e DATABASE_URL api \
+            python -m zona_oportunidades.operations.publish_gold
 
 # The API image already contains the PostgreSQL driver; this check needs no Spark/browser.
 # This replaces the image's server command with a one-off read-only database check.
