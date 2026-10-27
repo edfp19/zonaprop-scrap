@@ -1,0 +1,40 @@
+name: Storage connection check (manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zonaprop-storage-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+      S3_BUCKET: ${{ secrets.S3_BUCKET }}
+      S3_ENDPOINT_URL: ${{ secrets.S3_ENDPOINT_URL }}
+      S3_REGION: ${{ vars.S3_REGION }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check storage settings
+        shell: bash
+        run: |
+          test -n "$AWS_ACCESS_KEY_ID" && test -n "$AWS_SECRET_ACCESS_KEY"
+          test -n "$S3_BUCKET" && test -n "$S3_ENDPOINT_URL" && test -n "$S3_REGION"
+      - name: Build pipeline image
+        run: docker compose build pipeline
+      - name: Upload, read back and delete test files
+        run: |
+          docker compose run --rm --no-deps -T \
+            -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY \
+            -e S3_BUCKET -e S3_ENDPOINT_URL -e S3_REGION pipeline \
+            python -m zona_oportunidades.operations.storage_check
+
+# Explicit operator trial: a tiny text payload and its manifest under storage-check/<uuid>/.
+# No collection, Gold publication or dataset deletion. No quota-reclamation attestation.
