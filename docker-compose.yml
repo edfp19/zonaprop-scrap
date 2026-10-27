@@ -48,6 +48,33 @@ services:
       - "4444:4444"
       - "7900:7900"
 
+  migrate:
+    image: postgres:16-alpine
+    environment:
+      PGHOST: postgres
+      PGDATABASE: ${POSTGRES_DB:-zonaprop}
+      PGUSER: ${POSTGRES_USER:-zonaprop}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-zonaprop}
+    volumes:
+      - ./infra/postgres:/migrations:ro
+    command:
+      - psql
+      - -v
+      - ON_ERROR_STOP=1
+      - -f
+      - /migrations/init.sql
+      - -f
+      - /migrations/migrate_gold.sql
+      - -f
+      - /migrations/pipeline_storage.sql
+      - -f
+      - /migrations/bronze_quarantine.sql
+      - -f
+      - /migrations/pipeline_budget.sql
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   pipeline:
     build:
       context: .
@@ -63,8 +90,8 @@ services:
     volumes:
       - ./data:/data
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       selenium:
         condition: service_healthy
     restart: unless-stopped
@@ -76,8 +103,8 @@ services:
     command: ["uvicorn", "zona_oportunidades.presentation.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
     environment: *app_environment
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8000/salud"]
       interval: 10s

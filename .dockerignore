@@ -5,3 +5,10 @@ __pycache__
 .ruff_cache
 data
 tests
+.env*
+lessons
+scratchpad
+mutants
+.vercel
+.mypy_cache
+public

@@ -1,0 +1,25 @@
+{
+  "capacity": {
+    "project_id": "REPLACE_WITH_VERIFIED_PROJECT_ID"
+  },
+  "catalogue": {
+    "max_current_keys": 1000,
+    "max_weekly_keys": 1250,
+    "max_history_keys": 6250,
+    "max_age_days": 35
+  },
+  "job": {
+    "silver_bytes": 5000000,
+    "compaction_output_bytes": 25000000,
+    "sql_replacement_bytes": 10000000,
+    "sql_index_bytes": 10000000,
+    "sql_write_overhead_bytes": 20000000,
+    "compute_cu_hours": 2,
+    "transfer_bytes": 100000000,
+    "runner_input_bytes": 40000000,
+    "runner_staging_bytes": 60000000,
+    "runner_shuffle_bytes": 100000000
+  },
+  "max_working_bytes": 25000000,
+  "gc_grace_hours": 24
+}

@@ -67,3 +67,57 @@ def test_transactional_refresh_migration_and_failed_publish_preserve_snapshot(
     assert repository.replace([], 10, sale.collected_at).records == 0
     with psycopg.connect(postgres_dsn) as connection:
         assert connection.execute("SELECT count(*) FROM gold.opportunities").fetchone() == (0,)
+
+
+def test_repeatable_migration_preserves_phase_one_rows(postgres_dsn: str) -> None:
+    from pathlib import Path
+
+    repository = GoldRepository(postgres_dsn)
+    sale = candidate()
+    repository.replace([sale], 10, sale.collected_at)
+    with psycopg.connect(postgres_dsn) as connection:
+        connection.execute("ALTER TABLE gold.opportunities DROP CONSTRAINT opportunities_pkey")
+        connection.execute("ALTER TABLE gold.opportunities ADD PRIMARY KEY (listing_id)")
+        connection.execute("ALTER TABLE gold.opportunities DROP COLUMN latitude")
+        migration = Path("infra/postgres/migrate_gold.sql").read_text()
+        connection.execute(migration)
+        connection.execute(migration)
+        assert connection.execute("SELECT listing_id FROM gold.opportunities").fetchall() == [
+            ("42",)
+        ]
+    assert (
+        repository.replace(
+            [sale, replace(sale, operation="ALQUILER")], 10, sale.collected_at
+        ).records
+        == 2
+    )
+
+
+def test_writer_can_publish_without_ddl_and_reader_keeps_select(postgres_dsn: str) -> None:
+    from pathlib import Path
+
+    # Roll back cluster-level role setup along with all test grants and writes.
+    with psycopg.connect(postgres_dsn) as connection, connection.transaction(force_rollback=True):
+        connection.execute(Path("infra/postgres/web_reader.sql").read_text())
+        connection.execute(Path("infra/postgres/pipeline_writer.sql").read_text())
+        connection.execute("SET LOCAL ROLE pipeline_writer")
+        connection.execute("DELETE FROM gold.opportunities")
+        connection.execute(
+            "INSERT INTO ops.pipeline_runs (run_id, started_at, status) "
+            "VALUES ('00000000-0000-0000-0000-000000000001', now(), 'EN_PROGRESO')"
+        )
+        connection.execute("UPDATE ops.pipeline_runs SET bronze_records = 1")
+        for forbidden in (
+            "ALTER TABLE gold.opportunities ADD COLUMN forbidden TEXT",
+            "CREATE TABLE public.forbidden (id integer)",
+            "CREATE TEMP TABLE forbidden (id integer)",
+            "TRUNCATE ops.pipeline_runs",
+        ):
+            with pytest.raises(psycopg.errors.InsufficientPrivilege), connection.transaction():
+                connection.execute(forbidden)
+        connection.execute("RESET ROLE")
+        connection.execute("SET LOCAL ROLE web_reader")
+        assert connection.execute("SELECT count(*) FROM ops.pipeline_runs").fetchone() == (1,)
+        assert connection.execute("SELECT count(*) FROM gold.opportunities").fetchone() == (0,)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege), connection.transaction():
+            connection.execute("DELETE FROM gold.opportunities")

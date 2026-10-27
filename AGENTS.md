@@ -31,9 +31,9 @@
 - Keep Ruff as the linter. Preserve the configured Python target, import rules, and line length.
 - Provide repeatable correctness checks appropriate to a change. Distinguish linting, static type
   checking, runtime validation, and behavioral tests; none substitutes for all the others.
-- Ruff and pytest are configured. Mypy checks Gold, the API, dashboard server, and orchestration;
-  mutmut targets
-  the Gold price-assessment rules. Extend these focused scopes when important logic warrants it.
+- Ruff and pytest are configured. Mypy checks Gold, the API, dashboard server, orchestration,
+  operations and weekly retention; mutmut targets Gold price assessment and capacity admission.
+  Extend these focused scopes when important logic warrants it.
   Document reproducible commands and do not claim checks ran when they did not.
 
 ## Testing preferences

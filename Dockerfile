@@ -19,9 +19,9 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 ENV JAVA_HOME=/opt/java
 COPY pyproject.toml uv.lock README.md ./
-RUN uv sync --frozen --no-dev --extra collection --extra silver --no-install-project
+RUN uv sync --frozen --no-dev --extra collection --extra silver --extra cloud --no-install-project
 COPY src ./src
-RUN uv sync --frozen --no-dev --extra collection --extra silver
+RUN uv sync --frozen --no-dev --extra collection --extra silver --extra cloud
 
 FROM runtime-base AS api
 COPY pyproject.toml uv.lock README.md ./

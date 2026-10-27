@@ -11,15 +11,6 @@ class PipelineRunRepository:
         with psycopg.connect(self.dsn) as connection, connection.cursor() as cursor:
             cursor.execute(
                 """
-                UPDATE ops.pipeline_runs
-                SET status = 'FALLIDO', finished_at = %s,
-                    error_message = 'La ejecución fue interrumpida antes de finalizar.'
-                WHERE status = 'EN_PROGRESO'
-                """,
-                (datetime.now(UTC),),
-            )
-            cursor.execute(
-                """
                 INSERT INTO ops.pipeline_runs (run_id, started_at, status)
                 VALUES (%s, %s, 'EN_PROGRESO')
                 """,
@@ -75,3 +66,7 @@ class PipelineRunRepository:
                 """,
                 (datetime.now(UTC), message[:4000], run_id),
             )
+
+    def interrupt(self, run_id: str) -> None:
+        """Record only a known interrupted run; other workers may still be running."""
+        self.fail(run_id, "La ejecución fue interrumpida antes de finalizar.")

@@ -276,6 +276,7 @@ function buildMarker(row) {
 let rows = [];
 let markers = [];
 let evaluated = 0;
+let latestObservation = null;
 let firstFit = true;
 
 function setOverlay(mode, text, retry = false) {
@@ -296,6 +297,11 @@ function setStats(visible, unlocated) {
     ["Candidatas", number(visible.filter((m) => m.row.is_opportunity).length), ""],
   ];
   if (unlocated) items.push(["Sin ubicación", number(unlocated), ""]);
+  if (latestObservation && !Number.isNaN(latestObservation.getTime())) {
+    items.push(["Datos al", latestObservation.toLocaleDateString("es-AR", {
+      timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit",
+    }), ""]);
+  }
   $("stats").replaceChildren(
     ...items.map(([label, value, cls]) => {
       const box = el("div", cls);
@@ -360,6 +366,7 @@ async function load() {
     if (!payload || !Array.isArray(payload.resultados)) throw new Error("Respuesta inesperada de la API.");
     rows = payload.resultados.filter((r) => r && typeof r === "object");
     evaluated = Number.isFinite(payload.evaluados) ? payload.evaluados : rows.length;
+    latestObservation = payload.latest_observation_at ? new Date(payload.latest_observation_at) : null;
     markers = rows.filter(hasLocation).map(buildMarker);
     fillAreas();
     render();

@@ -1,9 +1,23 @@
-"""Publish the complete Gold serving snapshot in one PostgreSQL transaction."""
+r"""Publish Gold transactionally; runtime connections need DML rights only.
+
+One-time local upgrade for an existing phase-1 Compose volume, as its owner::
+
+    docker compose exec -T postgres sh -c \
+      'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+      < infra/postgres/migrate_gold.sql
+
+This repeatable migration preserves rows and upgrades the key and map columns.
+Fresh volumes already receive the current schema from init.sql. For a hosted
+installation, run init.sql, migrate_gold.sql and pipeline_writer.sql as the
+owner through a direct connection; set the writer password privately afterward.
+The runtime writer must never be responsible for schema upgrades.
+"""
 
 import json
 from collections.abc import Iterable
 from dataclasses import asdict
 from datetime import datetime
+from typing import Any
 
 import psycopg
 
@@ -15,34 +29,20 @@ class GoldRepository:
         self.dsn = dsn
 
     def replace(
-        self, opportunities: Iterable[Opportunity], minimum_count: int, computed_at: datetime
+        self,
+        opportunities: Iterable[Opportunity],
+        minimum_count: int,
+        computed_at: datetime,
+        *,
+        connection: psycopg.Connection[Any] | None = None,
     ) -> GoldRunResult:
+        if connection is None:
+            with psycopg.connect(self.dsn) as owned_connection:
+                return self.replace(
+                    opportunities, minimum_count, computed_at, connection=owned_connection
+                )
         records, candidates = 0, 0
-        with psycopg.connect(self.dsn) as connection, connection.cursor() as cursor:
-            cursor.execute(
-                """
-                ALTER TABLE gold.opportunities
-                    ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION,
-                    ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION,
-                    ADD COLUMN IF NOT EXISTS photo_url TEXT,
-                    ADD COLUMN IF NOT EXISTS geolocation_visibility TEXT;
-                """
-            )
-            # Existing Compose volumes retain the phase-1 schema; migrate its single-column key.
-            cursor.execute(
-                """
-                DO $$ BEGIN
-                    IF EXISTS (
-                        SELECT 1 FROM pg_constraint
-                        WHERE conrelid = 'gold.opportunities'::regclass
-                          AND contype = 'p' AND cardinality(conkey) = 1
-                    ) THEN
-                        ALTER TABLE gold.opportunities DROP CONSTRAINT opportunities_pkey;
-                        ALTER TABLE gold.opportunities ADD PRIMARY KEY (listing_id, operation);
-                    END IF;
-                END $$;
-                """
-            )
+        with connection.cursor() as cursor:
             # DELETE is transactional and lets readers continue seeing the old committed snapshot.
             cursor.execute("DELETE FROM gold.opportunities")
             for opportunity in opportunities:

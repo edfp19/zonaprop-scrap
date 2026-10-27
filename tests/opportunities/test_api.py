@@ -56,6 +56,9 @@ def test_filters_pagination_and_quality_flags(postgres_dsn: str, monkeypatch) ->
     assert client.get("/oportunidades?limit=0").status_code == 422
     assert client.get("/oportunidades?operation=UNKNOWN").status_code == 422
     snapshot = client.get("/mapa").json()
+    assert snapshot["latest_observation_at"] is not None
+    assert "s-maxage=3600" in client.get("/mapa").headers["Vercel-CDN-Cache-Control"]
+    assert "s-maxage=3600" in client.get("/api/mapa").headers["Vercel-CDN-Cache-Control"]
     assert client.get("/api/mapa").json() == snapshot
     assert snapshot["evaluados"] == 3
     assert len(snapshot["resultados"]) == 3

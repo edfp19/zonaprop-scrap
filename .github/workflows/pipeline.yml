@@ -1,0 +1,103 @@
+name: Pipeline and maintenance (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Operation
+        type: choice
+        options: [capacity-report, ingest, maintain, gc]
+        default: capacity-report
+      apply:
+        description: Apply verified changes (requires repository enablement)
+        type: boolean
+        default: false
+      usage_snapshot:
+        description: Fresh verified provider-usage JSON; never enter credentials here
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+# Collection and maintenance may overlap; the database lock protects shared state.
+concurrency:
+  group: zonaprop-${{ inputs.mode }}
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      MODE: ${{ inputs.mode }}
+      APPLY: ${{ inputs.apply }}
+      ENABLED: ${{ vars.PIPELINE_APPLY_ENABLED }}
+      RECLAMATION: ${{ vars.OBJECT_RECLAMATION_VERIFIED }}
+      PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+      CLOUD_POLICY_JSON: ${{ vars.CLOUD_POLICY_JSON }}
+      USAGE_JSON: ${{ inputs.usage_snapshot }}
+      DATABASE_URL: ${{ secrets.PIPELINE_DATABASE_URL }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+      S3_BUCKET: ${{ secrets.S3_BUCKET }}
+      S3_ENDPOINT_URL: ${{ secrets.S3_ENDPOINT_URL }}
+      S3_REGION: ${{ vars.S3_REGION }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check operator gates
+        shell: bash
+        run: |
+          if [[ "$APPLY" == true && "$ENABLED" != true ]]; then
+            echo "Applied jobs are disabled. Complete the capacity and storage trial first."
+            exit 1
+          fi
+          if [[ "$MODE" != capacity-report ]]; then
+            test -n "$PROJECT_ID" && test -n "$CLOUD_POLICY_JSON"
+            if [[ "$APPLY" == true ]]; then
+              test "$RECLAMATION" = true
+              test -n "$USAGE_JSON" && test -n "$DATABASE_URL"
+              test -n "$AWS_ACCESS_KEY_ID" && test -n "$AWS_SECRET_ACCESS_KEY"
+              test -n "$S3_BUCKET" && test -n "$S3_ENDPOINT_URL" && test -n "$S3_REGION"
+            fi
+          fi
+      - name: Build pipeline image
+        run: docker compose build pipeline
+      - name: Read-only capacity report
+        if: inputs.mode == 'capacity-report'
+        run: |
+          mkdir -p data
+          docker compose run --rm --no-deps -T pipeline \
+            python -m zona_oportunidades.operations capacity-report --data-root /data
+      - name: Prepare non-secret configuration
+        if: inputs.mode != 'capacity-report'
+        shell: bash
+        run: |
+          mkdir -p data/cloud
+          printf '%s' "$CLOUD_POLICY_JSON" > data/cloud/policy.json
+          if [[ -n "$USAGE_JSON" ]]; then
+            printf '%s' "$USAGE_JSON" > data/cloud/usage.json
+          fi
+      - name: Start collection browser
+        if: inputs.mode == 'ingest' && inputs.apply
+        run: docker compose up -d --wait --wait-timeout 120 selenium
+      - name: Run guarded operation
+        if: inputs.mode != 'capacity-report'
+        shell: bash
+        run: |
+          args=("$MODE" --policy /data/cloud/policy.json --project-id "$PROJECT_ID" --data-root /data)
+          [[ ! -f data/cloud/usage.json ]] || args+=(--usage /data/cloud/usage.json)
+          [[ "$APPLY" != true ]] || args+=(--apply)
+          [[ "$RECLAMATION" != true ]] || args+=(--reclamation-verified)
+          [[ -z "$S3_BUCKET" ]] || args+=(--bucket "$S3_BUCKET")
+          [[ -z "$S3_ENDPOINT_URL" ]] || args+=(--endpoint-url "$S3_ENDPOINT_URL")
+          [[ -z "$S3_REGION" ]] || args+=(--region "$S3_REGION")
+          docker compose run --rm --no-deps -T \
+            -e DATABASE_URL -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY pipeline \
+            python -m zona_oportunidades.operations.cloud "${args[@]}"
+      - name: Stop the browser
+        if: always() && inputs.mode == 'ingest' && inputs.apply
+        run: docker compose stop selenium
+
+# No cron trigger: fresh Free-plan usage and quota reclamation must be proven first.
+# Raw extracts, Silver and credential files are never uploaded as Actions artifacts.

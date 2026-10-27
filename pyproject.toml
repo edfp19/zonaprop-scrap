@@ -29,6 +29,9 @@ dashboard = [
 silver = [
   "pyspark==3.5.6",
 ]
+cloud = [
+  "boto3>=1.35,<2",
+]
 [dependency-groups]
 dev = [
   "mutmut>=3,<4",
@@ -58,6 +61,9 @@ files = [
   "src/zona_oportunidades/presentation/api/main.py",
   "src/zona_oportunidades/presentation/dashboard/app.py",
   "src/zona_oportunidades/pipeline",
+  "src/zona_oportunidades/operations",
+  "src/zona_oportunidades/listings/retention.py",
+  "app.py",
 ]
 strict = true
 follow_imports = "silent"
@@ -65,6 +71,12 @@ ignore_missing_imports = true
 
 [tool.mutmut]
 source_paths = ["src/"]
-only_mutate = ["src/zona_oportunidades/opportunities/domain.py"]
+only_mutate = [
+  "src/zona_oportunidades/opportunities/domain.py",
+  "src/zona_oportunidades/operations/capacity.py",
+]
 pytest_add_cli_args = ["-q"]
-pytest_add_cli_args_test_selection = ["tests/opportunities/test_domain.py"]
+pytest_add_cli_args_test_selection = [
+  "tests/opportunities/test_domain.py",
+  "tests/operations/test_capacity.py",
+]

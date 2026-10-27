@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any, Literal
 
 import psycopg
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Response
 from psycopg.rows import dict_row
 from pydantic import BaseModel
 
@@ -87,6 +87,7 @@ class OpportunityPage(BaseModel):
 class MapSnapshot(BaseModel):
     evaluados: int
     resultados: list[OpportunityView]
+    latest_observation_at: datetime | None = None
 
 
 def _opportunity_views(rows: list[dict[str, Any]]) -> list[OpportunityView]:
@@ -98,12 +99,21 @@ def _opportunity_views(rows: list[dict[str, Any]]) -> list[OpportunityView]:
 
 @app.get("/api/mapa", include_in_schema=False)
 @app.get("/mapa")
-def map_properties() -> MapSnapshot:
+def map_properties(response: Response) -> MapSnapshot:
     """The small teaching dataset, including above-average and thin-sample comparisons."""
     with database() as connection, connection.cursor() as cursor:
         cursor.execute("SELECT * FROM gold.opportunities ORDER BY listing_id, operation")
         rows = cursor.fetchall()
-    return MapSnapshot(evaluados=len(rows), resultados=_opportunity_views(rows))
+    # Weekly data tolerates an hour of edge caching; only successful public snapshots cache.
+    response.headers["Cache-Control"] = "public, max-age=0, must-revalidate"
+    response.headers["Vercel-CDN-Cache-Control"] = (
+        "public, s-maxage=3600, stale-while-revalidate=86400"
+    )
+    return MapSnapshot(
+        evaluados=len(rows),
+        resultados=_opportunity_views(rows),
+        latest_observation_at=max((row["collected_at"] for row in rows), default=None),
+    )
 
 
 @app.get("/oportunidades")

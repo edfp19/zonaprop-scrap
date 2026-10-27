@@ -31,6 +31,7 @@ def postgres_dsn() -> Iterator[str]:
                     "quality_flags TEXT",
                 )
                 connection.execute(schema)
+                connection.execute(Path("infra/postgres/migrate_gold.sql").read_text())
             yield dsn
         finally:
             admin.execute(sql.SQL("DROP DATABASE {} WITH (FORCE)").format(sql.Identifier(name)))
