@@ -1,0 +1,31 @@
+name: Database writer check (manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zonaprop-database-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      DATABASE_URL: ${{ secrets.PIPELINE_DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check writer setting
+        run: test -n "$DATABASE_URL"
+      - name: Build database client image
+        run: docker compose build api
+      - name: Verify writer identity and permissions (read-only)
+        run: |
+          docker compose run --rm --no-deps -T -e DATABASE_URL api \
+            python -m zona_oportunidades.operations.database_check
+
+# The API image already contains the PostgreSQL driver; this check needs no Spark/browser.
+# This replaces the image's server command with a one-off read-only database check.
