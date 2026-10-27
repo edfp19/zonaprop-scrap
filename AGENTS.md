@@ -2,6 +2,8 @@
 
 ## Purpose and communication
 
+- Use English for explanations, summaries and lessons unless explicitly requested otherwise.
+  Keep each lesson in one language.
 - This is a teaching project. Prefer the smallest clear implementation that teaches the concept;
   avoid production infrastructure and abstractions without a demonstrated need.
 - Explain the core concepts, responsibilities, and important files before implementation details.
