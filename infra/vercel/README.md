@@ -65,8 +65,10 @@ After code is pushed and Gold is seeded:
 5. Inspect the first build log: only the `api` extra should be installed, with no pyspark or
    selenium. Check the function bundle size in the deployment output.
 
-The install command uses `uv sync --active --frozen --no-dev --extra api`: `--active` installs
-into Vercel's build environment, and the committed lockfile pins dependency versions. The build
+The install command uses `uv sync --active --frozen --no-dev --extra api --no-editable`:
+`--active` installs into Vercel's build environment, and the committed lockfile pins dependency
+versions. `--no-editable` installs the actual package files instead of a link to the build
+checkout's `src/` directory, which is not a usable import path in the deployed function. The build
 command copies the dashboard assets into `public/`; no second copy is maintained in Git.
 `/api/mapa` is an alias for the existing `/mapa` query, so the browser URL works in both hosts.
 
@@ -78,6 +80,25 @@ uv run ruff check .
 uv run mypy
 uv run pytest tests/test_config.py tests/dashboard -q
 ```
+
+Check the installed API package independently of checkout paths and editable `.pth` links:
+
+```bash
+uv venv --python 3.12 /tmp/zonaprop-vercel-env
+VIRTUAL_ENV=/tmp/zonaprop-vercel-env uv sync --active --frozen --no-dev --extra api --no-editable
+/tmp/zonaprop-vercel-env/bin/python -I -S -c '
+import sys
+sys.path.insert(0, "/tmp/zonaprop-vercel-env/lib/python3.12/site-packages")
+from zona_oportunidades.presentation.api.main import app, health
+assert health() == {"estado": "ok"}
+assert any(route.path == "/api/mapa" for route in app.routes)
+print("Installed API imports without editable links")
+'
+```
+
+This simulates loading vendored packages by adding site-packages explicitly without processing
+editable links. It checks imports and the health function, not a live Neon connection or the
+complete Vercel bundle.
 
 Compose's existing API and Flask dashboard keep their separate images. Running the build script
 does not start collection or contact Neon. The cloud function requires Python 3.12, which is

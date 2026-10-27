@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "fastapi",
   "regions": ["iad1"],
-  "installCommand": "uv sync --active --frozen --no-dev --extra api",
+  "installCommand": "uv sync --active --frozen --no-dev --extra api --no-editable",
   "buildCommand": "python infra/vercel/build_static.py",
   "functions": {
     "app.py": {
