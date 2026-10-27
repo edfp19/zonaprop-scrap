@@ -13,6 +13,13 @@ from zona_oportunidades.collection.domain.models import (
 )
 
 READ_LISTING_STATE = """
+const navigation = performance.getEntriesByType('navigation')[0];
+if ([403, 429].includes(navigation?.responseStatus)) {
+    return {_source_http_status: navigation.responseStatus};
+}
+if (/un momento|just a moment/i.test(document.title)) {
+    return {_source_access_check: true};
+}
 const usable = state => Array.isArray(state?.listStore?.listPostings)
     && state.listStore.listPostings.length > 0;
 if (usable(window.__PRELOADED_STATE__)) return window.__PRELOADED_STATE__;
@@ -84,6 +91,12 @@ class ZonapropSeleniumSource:
     def _wait_for_state(self) -> dict[str, Any]:
         def get_state(driver: webdriver.Remote) -> dict[str, Any] | Literal[False]:
             state = driver.execute_script(READ_LISTING_STATE)
+            if state and state.get("_source_http_status") in (403, 429):
+                raise SourceAccessBlocked(
+                    f"Source returned HTTP {state['_source_http_status']}; collection stopped."
+                )
+            if state and state.get("_source_access_check"):
+                raise SourceAccessBlocked("Source presented an access check; collection stopped.")
             postings = state.get("listStore", {}).get("listPostings", []) if state else []
             return state if postings else False
 

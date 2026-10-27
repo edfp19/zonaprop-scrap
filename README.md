@@ -55,7 +55,11 @@ esas dependencias. Los archivos persisten en `./data` y la base en el volumen `p
 entre reinicios ordinarios.
 
 `COLLECTION_MAX_PAGES` limita las páginas por operación y región; el valor inicial es uno.
-`COLLECTION_DELAY_SECONDS` establece la pausa entre páginas. El primer objetivo rota diariamente.
+`COLLECTION_BATCH_PAGES=1` agrupa una página por lote y
+`COLLECTION_BATCH_COOLDOWN_SECONDS=60` pausa entre lotes, con una única sesión de navegador.
+`COLLECTION_DELAY_SECONDS=10` rige dentro de lotes más grandes. Cada lote guarda un checkpoint Bronze;
+un bloqueo o HTTP 429 detiene la ejecución. Son valores iniciales conservadores, no un límite
+verificado de Zonaprop. El primer objetivo rota diariamente.
 El estado y los logs están disponibles con:
 
 ```bash

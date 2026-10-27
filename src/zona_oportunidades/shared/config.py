@@ -21,7 +21,9 @@ class Settings(BaseSettings):
     collection_max_records: int = Field(default=250, ge=1)
     collection_max_bronze_bytes: int = Field(default=10_000_000, ge=1)
     pipeline_max_silver_bytes: int = Field(default=5_000_000, ge=1)
-    collection_delay_seconds: float = Field(default=3, ge=1)
+    collection_delay_seconds: float = Field(default=10, ge=1, le=3600)
+    collection_batch_pages: int = Field(default=1, ge=1, le=8)
+    collection_batch_cooldown_seconds: float = Field(default=60, ge=1, le=3600)
     collection_page_timeout_seconds: int = Field(default=45, ge=5)
     pipeline_interval_seconds: int = Field(default=86_400, ge=60)
     spark_master: str = "local[2]"

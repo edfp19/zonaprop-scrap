@@ -72,6 +72,8 @@ def collect_silver(
             targets=targets,
             max_pages=settings.collection_max_pages,
             delay_seconds=settings.collection_delay_seconds,
+            batch_pages=settings.collection_batch_pages,
+            batch_cooldown_seconds=settings.collection_batch_cooldown_seconds,
             max_records=settings.collection_max_records,
             max_bronze_bytes=settings.collection_max_bronze_bytes,
         ).execute(run_id)

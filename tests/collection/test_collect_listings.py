@@ -12,6 +12,13 @@ from zona_oportunidades.collection.domain.models import (
 from zona_oportunidades.collection.infrastructure.jsonl_repository import JsonlBronzeRepository
 
 
+@pytest.fixture(autouse=True)
+def no_real_wait(monkeypatch):
+    monkeypatch.setattr(
+        "zona_oportunidades.collection.application.collect_listings.time.sleep", lambda _: None
+    )
+
+
 class FakeSource:
     closed = False
 
@@ -216,3 +223,123 @@ def test_interruption_keeps_bronze_evidence_and_is_not_a_partial_error(
     assert manifest["error_count"] == 0
     assert manifest["failure_message"] == "stop"
     assert source.closed
+
+
+def test_batches_checkpoint_before_cooldown_and_do_not_sleep_after_last_page(tmp_path, monkeypatch):
+    waits = []
+    manifest_path = tmp_path / "bronze/manifests/batched.json"
+
+    def wait(seconds):
+        waits.append(seconds)
+        if seconds == 60:
+            manifest = json.loads(manifest_path.read_text())
+            assert manifest["status"] == "in_progress"
+            assert manifest["record_count"] in (2, 4)
+
+    monkeypatch.setattr(
+        "zona_oportunidades.collection.application.collect_listings.time.sleep", wait
+    )
+    source = FakeSource()
+    result = CollectListings(
+        source,
+        JsonlBronzeRepository(tmp_path),
+        (SearchTarget("VENTA", "CABA", "https://example.test"),),
+        5,
+        10,
+        batch_pages=2,
+        batch_cooldown_seconds=60,
+    ).execute("batched")
+    assert result.records == 5 and source.closed
+    assert waits == [10, 60, 10, 60]
+    manifest = json.loads(manifest_path.read_text())
+    assert manifest["status"] == "complete" and manifest["requested_pages"] == 5
+    assert manifest["batch_pages"] == 2 and manifest["batch_cooldown_seconds"] == 60
+
+
+def test_batch_cooldown_applies_between_targets_and_block_stops_further_batches(
+    tmp_path, monkeypatch
+):
+    waits, visited = [], []
+    monkeypatch.setattr(
+        "zona_oportunidades.collection.application.collect_listings.time.sleep", waits.append
+    )
+
+    class Source(FakeSource):
+        closes = 0
+
+        def collect_page(self, target, page, run_id):
+            visited.append(target.region)
+            if target.region == "GBA_NORTE":
+                checkpoint = json.loads(
+                    (tmp_path / "bronze/manifests/blocked-batch.json").read_text()
+                )
+                assert checkpoint["record_count"] == 1
+                raise SourceAccessBlocked("HTTP 429")
+            return super().collect_page(target, page, run_id)
+
+        def close(self):
+            self.closes += 1
+
+    source = Source()
+    with pytest.raises(SourceAccessBlocked):
+        CollectListings(
+            source,
+            JsonlBronzeRepository(tmp_path),
+            tuple(
+                SearchTarget("VENTA", region, "https://example.test")
+                for region in ("CABA", "GBA_NORTE", "GBA_SUR")
+            ),
+            1,
+            10,
+            batch_pages=1,
+            batch_cooldown_seconds=60,
+        ).execute("blocked-batch")
+    assert visited == ["CABA", "GBA_NORTE"] and waits == [60]
+    assert source.closes == 1
+    manifest = json.loads((tmp_path / "bronze/manifests/blocked-batch.json").read_text())
+    assert manifest["status"] == "failed" and manifest["record_count"] == 1
+
+
+def test_interrupted_cooldown_keeps_the_previous_checkpoint(tmp_path, monkeypatch):
+    def interrupt(seconds):
+        raise InterruptedError("cancelled during cooldown")
+
+    monkeypatch.setattr(
+        "zona_oportunidades.collection.application.collect_listings.time.sleep", interrupt
+    )
+    source = FakeSource()
+    with pytest.raises(InterruptedError):
+        CollectListings(
+            source,
+            JsonlBronzeRepository(tmp_path),
+            (SearchTarget("VENTA", "CABA", "https://example.test"),),
+            2,
+            10,
+        ).execute("cancelled-batch")
+    manifest = json.loads((tmp_path / "bronze/manifests/cancelled-batch.json").read_text())
+    assert source.closed and manifest["record_count"] == 1
+    assert manifest["status"] == "failed" and manifest["requested_pages"] == 1
+
+
+def test_checkpoint_failure_stops_collection_before_another_request(tmp_path):
+    class FailingRepository(JsonlBronzeRepository):
+        attempts = 0
+
+        def save_manifest(self, run_id, manifest):
+            self.attempts += 1
+            if self.attempts == 1:
+                raise OSError("checkpoint failed")
+            return super().save_manifest(run_id, manifest)
+
+    source = FakeSource()
+    with pytest.raises(OSError, match="checkpoint failed"):
+        CollectListings(
+            source,
+            FailingRepository(tmp_path),
+            (SearchTarget("VENTA", "CABA", "https://example.test"),),
+            3,
+            10,
+        ).execute("disk-failure")
+    manifest = json.loads((tmp_path / "bronze/manifests/disk-failure.json").read_text())
+    assert source.closed and manifest["requested_pages"] == 1
+    assert manifest["status"] == "failed" and manifest["record_count"] == 1

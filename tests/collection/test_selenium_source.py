@@ -91,3 +91,17 @@ def test_real_browser_challenge_is_still_detected(browser_source, title):
     browser_source.driver.execute_script("document.title = arguments[0];", title)
     with pytest.raises(SourceAccessBlocked):
         browser_source._wait_for_state()
+
+
+@pytest.mark.parametrize("status", [403, 429])
+def test_browser_http_denial_stops_without_retrying(browser_source, status):
+    browser_source.driver.execute_script(
+        """
+        Object.defineProperty(performance, 'getEntriesByType', {
+            value: () => [{responseStatus: arguments[0]}]
+        });
+    """,
+        status,
+    )
+    with pytest.raises(SourceAccessBlocked, match=f"HTTP {status}"):
+        browser_source._wait_for_state()
