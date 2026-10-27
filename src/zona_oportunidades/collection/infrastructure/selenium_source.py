@@ -1,11 +1,8 @@
-import logging
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as conditions
 from selenium.webdriver.support.ui import WebDriverWait
 
 from zona_oportunidades.collection.domain.models import (
@@ -15,11 +12,34 @@ from zona_oportunidades.collection.domain.models import (
     paginated_url,
 )
 
-logger = logging.getLogger(__name__)
+READ_LISTING_STATE = """
+const usable = state => Array.isArray(state?.listStore?.listPostings)
+    && state.listStore.listPostings.length > 0;
+if (usable(window.__PRELOADED_STATE__)) return window.__PRELOADED_STATE__;
+// The site removes preloaded state after hydration; its Redux provider keeps it.
+const root = document.getElementById('root');
+const key = Object.keys(root || {}).find(name => name.startsWith('__reactContainer$'));
+const fiber = key ? root[key] : null;
+const stack = fiber ? [fiber.stateNode?.current || fiber] : [];
+const seen = new Set();
+while (stack.length && seen.size < 1500) {
+    const node = stack.pop();
+    if (!node || seen.has(node)) continue;
+    seen.add(node);
+    const store = node.memoizedProps?.store;
+    if (typeof store?.getState === 'function') {
+        const state = store.getState();
+        if (usable(state)) return state;
+    }
+    if (node.child) stack.push(node.child);
+    if (node.sibling) stack.push(node.sibling);
+}
+return null;
+"""
 
 
 class ZonapropSeleniumSource:
-    EXTRACTOR_VERSION = "preloaded-state-v1"
+    EXTRACTOR_VERSION = "browser-listing-state-v2"
 
     def __init__(self, selenium_url: str, timeout_seconds: int = 45) -> None:
         options = webdriver.ChromeOptions()
@@ -36,9 +56,8 @@ class ZonapropSeleniumSource:
         self.driver.get(url)
         state = self._wait_for_state()
         currency_verified = self._is_usd_selected(state)
-        if not currency_verified:
-            currency_verified = self._try_select_usd()
-            state = self._wait_for_state()
+        # Capture the loaded page as-is. Silver preserves reported currencies;
+        # Gold filters USD. Changing the optional UI filter can lose valid data.
 
         postings = state.get("listStore", {}).get("listPostings", [])
         if not postings:
@@ -63,8 +82,8 @@ class ZonapropSeleniumSource:
         ]
 
     def _wait_for_state(self) -> dict[str, Any]:
-        def get_state(driver: webdriver.Remote) -> dict[str, Any] | bool:
-            state = driver.execute_script("return window.__PRELOADED_STATE__ || null")
+        def get_state(driver: webdriver.Remote) -> dict[str, Any] | Literal[False]:
+            state = driver.execute_script(READ_LISTING_STATE)
             postings = state.get("listStore", {}).get("listPostings", []) if state else []
             return state if postings else False
 
@@ -72,7 +91,7 @@ class ZonapropSeleniumSource:
             return self.wait.until(get_state)
         except TimeoutException as exc:
             title = self.driver.title
-            if "un momento" in title.casefold():
+            if any(marker in title.casefold() for marker in ("un momento", "just a moment")):
                 raise SourceAccessBlocked(
                     "Zonaprop presentó una verificación de acceso ('Un momento…'). "
                     "No se intentará evadirla."
@@ -85,36 +104,6 @@ class ZonapropSeleniumSource:
     def _is_usd_selected(state: dict[str, Any]) -> bool:
         units = state.get("listStore", {}).get("filters", {}).get("price", {}).get("units", [])
         return any(unit.get("label") == "USD" and unit.get("selected") for unit in units)
-
-    def _try_select_usd(self) -> bool:
-        """Intenta fijar USD en el filtro visible; nunca inventa una conversión."""
-        try:
-            self.wait.until(
-                conditions.element_to_be_clickable(
-                    (By.CSS_SELECTOR, "[data-qa='filters-priceRangeMore']")
-                )
-            ).click()
-            candidates = self.driver.find_elements(
-                By.XPATH,
-                "//label[contains(normalize-space(.), 'USD')] | "
-                "//button[normalize-space(.)='USD'] | //input[@value='2']",
-            )
-            if not candidates:
-                logger.warning(
-                    "No se encontró el control de moneda USD; se conservará el contexto real"
-                )
-                return False
-            candidates[0].click()
-            return bool(
-                self.wait.until(
-                    lambda driver: self._is_usd_selected(
-                        driver.execute_script("return window.__PRELOADED_STATE__ || {}")
-                    )
-                )
-            )
-        except Exception:
-            logger.warning("No fue posible seleccionar USD en la interfaz", exc_info=True)
-            return False
 
     def close(self) -> None:
         self.driver.quit()
