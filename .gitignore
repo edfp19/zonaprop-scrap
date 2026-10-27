@@ -1,4 +1,6 @@
 .env
+.env.*
+!.env.example
 .venv/
 __pycache__/
 .pytest_cache/
@@ -10,3 +12,7 @@ __pycache__/
 data/
 lessons/
 scratchpad/
+.mypy_cache/
+mutants/
+.vercel/
+public/

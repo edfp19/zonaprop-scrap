@@ -1,0 +1,29 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "fastapi",
+  "regions": ["iad1"],
+  "installCommand": "uv sync --active --frozen --no-dev --extra api",
+  "buildCommand": "python infra/vercel/build_static.py",
+  "functions": {
+    "app.py": {
+      "excludeFiles": "{tests/**,lessons/**,data/**,scratchpad/**,mutants/**,.venv/**,infra/**,public/**}"
+    }
+  },
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self' https://unpkg.com; img-src 'self' data: http: https:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+        },
+        {"key": "X-Content-Type-Options", "value": "nosniff"},
+        {"key": "Referrer-Policy", "value": "strict-origin-when-cross-origin"}
+      ]
+    },
+    {
+      "source": "/api/mapa",
+      "headers": [{"key": "Cache-Control", "value": "no-store"}]
+    }
+  ]
+}

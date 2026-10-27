@@ -2,82 +2,59 @@ import os
 from pathlib import Path
 
 import requests
-from taipy.gui import Gui
+from flask import Flask, Response, jsonify, send_from_directory
 
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
+STATIC_DIR = Path(__file__).with_name("static")
 
-estado = "Consultando…"
-bronze = 0
-silver = 0
-gold = 0
-mensaje = ""
+# Leaflet comes from unpkg and tiles from OpenStreetMap; listing photos come from Zonaprop's CDN.
+CONTENT_SECURITY_POLICY = (
+    "default-src 'self'; script-src 'self' https://unpkg.com; "
+    "style-src 'self' https://unpkg.com; img-src 'self' data: http: https:; "
+    "connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+)
+
+app = Flask(__name__, static_folder=str(STATIC_DIR), static_url_path="/static")
 
 
-def on_init(state) -> None:
+@app.after_request
+def add_security_headers(response: Response) -> Response:
+    response.headers["Content-Security-Policy"] = CONTENT_SECURITY_POLICY
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    # OSM's tile policy asks for a Referer; listing photos opt out per <img>.
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
+
+
+@app.get("/")
+def index() -> Response:
+    return send_from_directory(STATIC_DIR, "index.html", max_age=0)
+
+
+@app.get("/favicon.ico")
+def favicon() -> tuple[str, int]:
+    return "", 204
+
+
+@app.get("/api/mapa")
+def map_data() -> tuple[Response, int] | Response:
+    """Same-origin proxy: the browser cannot resolve the internal `api` hostname."""
     try:
-        response = requests.get(f"{API_BASE_URL}/estado-pipeline", timeout=5)
-        response.raise_for_status()
-        data = response.json()
-        state.estado = data.get("status") or data.get("estado", "—")
-        state.bronze = data.get("bronze_records", 0)
-        state.silver = data.get("silver_records", 0)
-        state.gold = data.get("gold_records", 0)
-        state.mensaje = data.get("mensaje") or data.get("error_message") or ""
-    except requests.RequestException as exc:
-        state.estado = "ERROR"
-        state.mensaje = f"No fue posible consultar el pipeline: {exc}"
-
-
-PAGE = """
-# Oportunidades inmobiliarias
-
-Departamentos en CABA y AMBA · Proyecto educativo de ingeniería de datos
-
-<|part|class_name=checkpoint|
-**Checkpoint 2: Bronze + Silver.** Preservamos observaciones originales y las transformamos en
-Parquet histórico. Todavía no calculamos oportunidades ni puntajes Gold.
-|>
-
-## Última ejecución
-
-<|{mensaje}|text|>
-
-<|layout|columns=1 1 1 1|
-<|part|class_name=metric|
-#### Estado
-<|{estado}|text|>
-|>
-<|part|class_name=metric|
-#### Registros Bronze
-<|{bronze}|text|>
-|>
-<|part|class_name=metric|
-#### Registros Silver
-<|{silver}|text|>
-|>
-<|part|class_name=metric|
-#### Registros Gold
-<|{gold}|text|>
-|>
-|>
-
-## Capas del proyecto
-
-1. **Bronze — actual:** JSONL append-only con el contenido observado y su contexto.
-2. **Silver — actual:** Parquet tipado, normalizado y deduplicado mediante Spark.
-3. **Gold:** comparables y candidatos por debajo del promedio en PostgreSQL.
-"""
-
-
-def main() -> None:
-    css_file = Path(__file__).with_name("dashboard.css")
-    Gui(page=PAGE, css_file=str(css_file)).run(
-        host="0.0.0.0",
-        port=8501,
-        title="Oportunidades inmobiliarias",
-        use_reloader=False,
-    )
+        upstream = requests.get(f"{API_BASE_URL}/mapa", timeout=(3, 20))
+    except requests.Timeout:
+        return jsonify(error="La API tardó demasiado en responder."), 504
+    except requests.RequestException:
+        return jsonify(error="No fue posible conectar con la API."), 502
+    if not upstream.ok:
+        return jsonify(error=f"La API respondió con el estado {upstream.status_code}."), 502
+    try:
+        payload = upstream.json()
+    except ValueError:
+        return jsonify(error="La API devolvió una respuesta que no es JSON."), 502
+    response = jsonify(payload)
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 if __name__ == "__main__":
-    main()
+    app.run(host="0.0.0.0", port=8501)

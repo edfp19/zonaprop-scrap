@@ -1,7 +1,8 @@
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import quote
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -9,6 +10,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     data_root: Path = Path("data")
+    database_url: SecretStr | None = None
     postgres_host: str = "localhost"
     postgres_port: int = 5432
     postgres_db: str = "zonaprop"
@@ -26,9 +28,12 @@ class Settings(BaseSettings):
 
     @property
     def postgres_dsn(self) -> str:
+        if self.database_url is not None:
+            return self.database_url.get_secret_value()
         return (
-            f"postgresql://{self.postgres_user}:{self.postgres_password}"
-            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
+            f"postgresql://{quote(self.postgres_user, safe='')}:"
+            f"{quote(self.postgres_password, safe='')}"
+            f"@{self.postgres_host}:{self.postgres_port}/{quote(self.postgres_db, safe='')}"
         )
 
     @property

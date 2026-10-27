@@ -44,16 +44,25 @@ class PipelineRunRepository:
         warning: str | None = None,
         *,
         silver_records: int | None = None,
+        gold_records: int | None = None,
     ) -> None:
         with psycopg.connect(self.dsn) as connection, connection.cursor() as cursor:
             cursor.execute(
                 """
                 UPDATE ops.pipeline_runs
                 SET status = 'EXITOSO', finished_at = %s, bronze_records = %s,
-                    silver_records = COALESCE(%s, silver_records), error_message = %s
+                    silver_records = COALESCE(%s, silver_records),
+                    gold_records = COALESCE(%s, gold_records), error_message = %s
                 WHERE run_id = %s
                 """,
-                (datetime.now(UTC), bronze_records, silver_records, warning, run_id),
+                (datetime.now(UTC), bronze_records, silver_records, gold_records, warning, run_id),
+            )
+
+    def record_silver(self, run_id: str, count: int) -> None:
+        with psycopg.connect(self.dsn) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE ops.pipeline_runs SET silver_records = %s WHERE run_id = %s",
+                (count, run_id),
             )
 
     def fail(self, run_id: str, message: str) -> None:

@@ -9,6 +9,8 @@ from zona_oportunidades.collection.domain.models import SEARCH_TARGETS
 from zona_oportunidades.collection.infrastructure.jsonl_repository import JsonlBronzeRepository
 from zona_oportunidades.collection.infrastructure.selenium_source import ZonapropSeleniumSource
 from zona_oportunidades.listings.runner import run_bronze_file
+from zona_oportunidades.opportunities.domain import ComparisonPolicy
+from zona_oportunidades.opportunities.runner import refresh_gold
 from zona_oportunidades.pipeline.run_repository import PipelineRunRepository
 from zona_oportunidades.shared.config import get_settings
 from zona_oportunidades.shared.logging import configure_logging
@@ -44,6 +46,16 @@ def run_collection() -> None:
         silver_result = run_bronze_file(
             result.bronze_path, settings.data_root, master=settings.spark_master
         )
+        runs.record_silver(run_id, silver_result.silver_records)
+        gold_result = refresh_gold(
+            settings.data_root,
+            settings.postgres_dsn,
+            ComparisonPolicy(
+                minimum_count=settings.comparable_min_count,
+                area_tolerance=settings.comparable_area_tolerance,
+            ),
+            master=settings.spark_master,
+        )
         warning = None
         if result.errors:
             warning = f"La recolección finalizó con {len(result.errors)} error(es) parcial(es)."
@@ -52,18 +64,21 @@ def run_collection() -> None:
             result.records,
             warning,
             silver_records=silver_result.silver_records,
+            gold_records=gold_result.records,
         )
         logger.info(
-            "Checkpoint Bronze→Silver completo: %s Bronze en %s; %s Silver en %s "
-            "(%s errores parciales)",
+            "Checkpoint Bronze→Silver→Gold completo: %s Bronze en %s; %s Silver en %s; "
+            "%s Gold (%s candidatos; %s errores parciales)",
             result.records,
             result.bronze_path,
             silver_result.silver_records,
             silver_result.output_path,
+            gold_result.records,
+            gold_result.candidates,
             len(result.errors),
         )
     except Exception as exc:
-        logger.exception("Falló la ejecución Bronze→Silver %s", run_id)
+        logger.exception("Falló la ejecución Bronze→Silver→Gold %s", run_id)
         runs.fail(run_id, str(exc))
 
 

@@ -23,14 +23,16 @@ api = [
   "uvicorn[standard]>=0.32,<1",
 ]
 dashboard = [
+  "flask>=3.1,<4",
   "requests>=2.32,<3",
-  "taipy-gui>=4,<5",
 ]
 silver = [
   "pyspark==3.5.6",
 ]
 [dependency-groups]
 dev = [
+  "mutmut>=3,<4",
+  "mypy>=1.13,<2",
   "pytest>=8.3,<9",
   "pytest-cov>=6,<7",
   "ruff>=0.8,<1",
@@ -49,3 +51,20 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+files = [
+  "src/zona_oportunidades/opportunities",
+  "src/zona_oportunidades/presentation/api/main.py",
+  "src/zona_oportunidades/presentation/dashboard/app.py",
+  "src/zona_oportunidades/pipeline",
+]
+strict = true
+follow_imports = "silent"
+ignore_missing_imports = true
+
+[tool.mutmut]
+source_paths = ["src/"]
+only_mutate = ["src/zona_oportunidades/opportunities/domain.py"]
+pytest_add_cli_args = ["-q"]
+pytest_add_cli_args_test_selection = ["tests/opportunities/test_domain.py"]

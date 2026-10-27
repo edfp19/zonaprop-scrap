@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS ops.pipeline_runs (
 );
 
 CREATE TABLE IF NOT EXISTS gold.opportunities (
-    listing_id TEXT PRIMARY KEY,
+    listing_id TEXT NOT NULL,
     operation TEXT NOT NULL,
     property_type TEXT NOT NULL,
     title TEXT NOT NULL,
@@ -33,7 +33,12 @@ CREATE TABLE IF NOT EXISTS gold.opportunities (
     is_opportunity BOOLEAN NOT NULL,
     collected_at TIMESTAMPTZ NOT NULL,
     run_id TEXT NOT NULL,
-    quality_flags TEXT
+    latitude DOUBLE PRECISION,
+    longitude DOUBLE PRECISION,
+    photo_url TEXT,
+    geolocation_visibility TEXT,
+    quality_flags TEXT,
+    PRIMARY KEY (listing_id, operation)
 );
 
 CREATE INDEX IF NOT EXISTS opportunities_filters_idx

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Oportunidades inmobiliarias</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H"
+        crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"
+        integrity="sha384-pmjIAcz2bAn0xukfxADbZIb3t8oRT9Sv0rvO+BR5Csr6Dhqq+nZs59P0pPKQJkEV"
+        crossorigin="anonymous">
+  <link rel="stylesheet" href="/static/dashboard.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <div>
+        <h1>Oportunidades inmobiliarias</h1>
+        <p>CABA y AMBA · precios pedidos, no tasaciones</p>
+      </div>
+    </div>
+    <dl class="stats" id="stats" aria-label="Resumen"></dl>
+  </header>
+
+  <main class="stage">
+    <div id="map" role="application" aria-label="Mapa de propiedades"></div>
+
+    <form class="filters" id="filters" aria-label="Filtros">
+      <label>Operación
+        <select id="f-operation">
+          <option value="">Todas</option>
+          <option value="VENTA">Venta</option>
+          <option value="ALQUILER">Alquiler</option>
+        </select>
+      </label>
+      <label>Zona
+        <select id="f-area"><option value="">Todas</option></select>
+      </label>
+      <label>Precio vs. promedio
+        <select id="f-relation">
+          <option value="">Todos</option>
+          <option value="below">Por debajo</option>
+          <option value="above">Por encima</option>
+          <option value="neutral">Igual o sin referencia</option>
+        </select>
+      </label>
+      <label class="check">
+        <input type="checkbox" id="f-sufficient"> Solo muestra suficiente
+      </label>
+    </form>
+
+
+    <aside class="legend" aria-label="Leyenda">
+      <details id="legend" open>
+        <summary>Precio frente al promedio de comparables</summary>
+        <ul>
+          <li><span class="dot below" aria-hidden="true">▼</span> Por debajo del promedio</li>
+          <li><span class="dot above" aria-hidden="true">▲</span> Por encima del promedio</li>
+          <li><span class="dot neutral" aria-hidden="true">●</span> Igual o sin referencia</li>
+          <li><span class="dot dashed" aria-hidden="true"></span> Borde punteado: muestra pequeña</li>
+        </ul>
+        <p>Con pocos comparables, el color es una referencia orientativa; la ubicación puede ser aproximada.</p>
+      </details>
+    </aside>
+
+    <div class="overlay" id="overlay" role="status" aria-live="polite">
+      <div class="spinner" aria-hidden="true"></div>
+      <p id="overlay-text">Cargando propiedades…</p>
+      <button type="button" id="retry" hidden>Reintentar</button>
+    </div>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH"
+          crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"
+          integrity="sha384-eXVCORTRlv4FUUgS/xmOyr66XBVraen8ATNLMESp92FKXLAMiKkerixTiBvXriZr"
+          crossorigin="anonymous"></script>
+  <script src="/static/dashboard.js"></script>
+</body>
+</html>
